@@ -53,3 +53,29 @@ export function decodeJpegFragment(fragment) {
 
   return { ok: true, bytes };
 }
+
+export function integerScaleSize(
+  sourceWidth,
+  sourceHeight,
+  availableWidth,
+  availableHeight
+) {
+  if (
+    sourceWidth <= 0 ||
+    sourceHeight <= 0 ||
+    availableWidth <= 0 ||
+    availableHeight <= 0
+  ) {
+    return { width: 0, height: 0 };
+  }
+
+  const fit = Math.min(
+    availableWidth / sourceWidth,
+    availableHeight / sourceHeight
+  );
+  const scale = fit >= 1 ? Math.floor(fit) : fit;
+  return {
+    width: Math.max(1, Math.floor(sourceWidth * scale)),
+    height: Math.max(1, Math.floor(sourceHeight * scale)),
+  };
+}
