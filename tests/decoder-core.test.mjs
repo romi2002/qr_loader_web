@@ -2,34 +2,55 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  BASE43_ALPHABET,
   FRAGMENT_VERSION_PREFIX,
-  LEGACY_DATA_PREFIX,
+  decodeBase43,
   decodeJpegFragment,
   integerScaleSize,
 } from "../decoder-core.mjs";
 
-const MINIMAL_JPEG_BASE64 = "/9j/2Q==";
+const MINIMAL_JPEG_BASE43 = "ZI7ZI8";
 
-test("decodes the versioned firmware fragment", () => {
+test("decodes the Base43 firmware fragment", () => {
   const result = decodeJpegFragment(
-    `#${FRAGMENT_VERSION_PREFIX}${MINIMAL_JPEG_BASE64}`
+    `#${FRAGMENT_VERSION_PREFIX}${MINIMAL_JPEG_BASE43}`
   );
   assert.equal(result.ok, true);
   assert.deepEqual([...result.bytes], [0xff, 0xd8, 0xff, 0xd9]);
 });
 
-test("accepts raw and legacy data URL fragments", () => {
-  assert.equal(decodeJpegFragment(`#${MINIMAL_JPEG_BASE64}`).ok, true);
-  assert.equal(
-    decodeJpegFragment(`#${LEGACY_DATA_PREFIX}${MINIMAL_JPEG_BASE64}`).ok,
-    true
-  );
+test("decodes known even and odd Base43 vectors", () => {
+  assert.deepEqual([...decodeBase43("ZJ3").bytes], [0xff, 0xff]);
+  assert.deepEqual([...decodeBase43("ZJ30:").bytes], [0xff, 0xff, 0x2a]);
+  assert.deepEqual([...decodeBase43("5.").bytes], [0xff]);
 });
 
-test("reports empty, malformed, and non-JPEG payloads", () => {
+test("rejects malformed Base43 groups and values", () => {
+  assert.equal(decodeBase43("").code, "empty_payload");
+  assert.equal(decodeBase43("A").code, "invalid_length");
+  assert.equal(decodeBase43("abc").code, "invalid_character");
+  assert.equal(decodeBase43(":::").code, "invalid_value");
+  assert.equal(decodeBase43("::").code, "invalid_value");
+});
+
+test("rejects old Base64, legacy data URLs, and non-JPEG data", () => {
   assert.equal(decodeJpegFragment("").code, "empty");
-  assert.equal(decodeJpegFragment("#v1/not base64").code, "invalid_base64");
-  assert.equal(decodeJpegFragment("#v1/dGV4dA==").code, "not_jpeg");
+  assert.notEqual(decodeJpegFragment("#v1//9j/2Q==").ok, true);
+  assert.equal(
+    decodeJpegFragment("#data:image/jpeg;base64,/9j/2Q==").code,
+    "unsupported"
+  );
+  assert.equal(decodeJpegFragment("#v1/000").code, "not_jpeg");
+});
+
+test("preserves every Base43 character in a URL fragment", () => {
+  const url = new URL(
+    `https://qr.abiel.dev/#${FRAGMENT_VERSION_PREFIX}${BASE43_ALPHABET}`
+  );
+  assert.equal(
+    url.hash,
+    `#${FRAGMENT_VERSION_PREFIX}${BASE43_ALPHABET}`
+  );
 });
 
 test("uses the largest integer pixel scale that fits", () => {

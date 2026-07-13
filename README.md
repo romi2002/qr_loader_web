@@ -1,13 +1,18 @@
 # QR Loader Web
 
 A static, client-only decoder for JPEG images embedded in Badge Camera QR
-codes. It is designed to be hosted at:
+codes. It is hosted at:
 
-`https://romi2002.github.io/qr_loader_web/`
+`https://qr.abiel.dev/`
 
 The firmware generates URLs in this form:
 
-`https://romi2002.github.io/qr_loader_web/#v1/BASE64_JPEG`
+`https://qr.abiel.dev/#v1/BASE43_JPEG`
+
+The firmware uses a URL-safe Base43 alphabet so the JPEG fragment can use QR
+alphanumeric mode. This fits up to 1,036 JPEG bytes in a version-23-L symbol.
+The v1 format is Base43 only; previous Base64 links are intentionally not
+supported.
 
 Everything after `#` is a URL fragment. The browser uses it to reconstruct the
 JPEG locally; it is not included in the HTTP request to GitHub Pages. The site
@@ -35,6 +40,5 @@ Serve the directory with any static file server, then append a JPEG payload to
 the URL fragment. For example:
 
 ```text
-http://localhost:8000/#v1/BASE64_JPEG
+http://localhost:8000/#v1/BASE43_JPEG
 ```
-

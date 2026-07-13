@@ -1,46 +1,75 @@
 export const FRAGMENT_VERSION_PREFIX = "v1/";
-export const LEGACY_DATA_PREFIX = "data:image/jpeg;base64,";
-const MAX_BASE64_CHARACTERS = 2_000_000;
+export const BASE43_ALPHABET =
+  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$*+-./:";
+const BASE43 = 43;
+const MAX_BASE43_CHARACTERS = 1554;
 
 function failure(code, message) {
   return { ok: false, code, message };
 }
 
-export function decodeJpegFragment(fragment) {
-  let payload = String(fragment ?? "").replace(/^#/, "");
-  if (!payload) {
+export function decodeBase43(payload) {
+  if (!payload || payload.length > MAX_BASE43_CHARACTERS) {
     return failure(
-      "empty",
-      "Scan the QR code shown on your Badge Camera to load a photo."
+      payload ? "too_large" : "empty_payload",
+      "The Base43 payload length is invalid."
     );
   }
-
-  if (payload.startsWith(FRAGMENT_VERSION_PREFIX)) {
-    payload = payload.slice(FRAGMENT_VERSION_PREFIX.length);
-  } else if (payload.startsWith(LEGACY_DATA_PREFIX)) {
-    payload = payload.slice(LEGACY_DATA_PREFIX.length);
+  if (payload.length % 3 === 1) {
+    return failure("invalid_length", "The Base43 payload is incomplete.");
   }
 
-  if (payload.length > MAX_BASE64_CHARACTERS) {
-    return failure("too_large", "The photo payload is unexpectedly large.");
+  const values = [];
+  for (const character of payload) {
+    const value = BASE43_ALPHABET.indexOf(character);
+    if (value < 0) {
+      return failure("invalid_character", "The Base43 payload is invalid.");
+    }
+    values.push(value);
   }
 
-  if (
-    payload.length === 0 ||
-    payload.length % 4 !== 0 ||
-    !/^[A-Za-z0-9+/]+={0,2}$/.test(payload)
-  ) {
-    return failure("invalid_base64", "This QR code does not contain a valid photo.");
+  const bytes = [];
+  let offset = 0;
+  while (offset + 3 <= values.length) {
+    const value =
+      values[offset] * BASE43 * BASE43 +
+      values[offset + 1] * BASE43 +
+      values[offset + 2];
+    if (value > 0xffff) {
+      return failure("invalid_value", "The Base43 payload is invalid.");
+    }
+    bytes.push(value >> 8, value & 0xff);
+    offset += 3;
   }
 
-  let binary;
-  try {
-    binary = atob(payload);
-  } catch {
-    return failure("invalid_base64", "This QR code does not contain a valid photo.");
+  if (offset < values.length) {
+    const value = values[offset] * BASE43 + values[offset + 1];
+    if (value > 0xff) {
+      return failure("invalid_value", "The Base43 payload is invalid.");
+    }
+    bytes.push(value);
   }
 
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return { ok: true, bytes: Uint8Array.from(bytes) };
+}
+
+export function decodeJpegFragment(fragment) {
+  const value = String(fragment ?? "").replace(/^#/, "");
+  if (!value) {
+    return failure("empty", "The URL does not contain an image.");
+  }
+  if (!value.startsWith(FRAGMENT_VERSION_PREFIX)) {
+    return failure("unsupported", "The image encoding is not supported.");
+  }
+
+  const decoded = decodeBase43(
+    value.slice(FRAGMENT_VERSION_PREFIX.length)
+  );
+  if (!decoded.ok) {
+    return decoded;
+  }
+
+  const { bytes } = decoded;
   if (
     bytes.length < 4 ||
     bytes[0] !== 0xff ||

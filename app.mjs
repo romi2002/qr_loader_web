@@ -1,4 +1,7 @@
-import { decodeJpegFragment, integerScaleSize } from "./decoder-core.mjs";
+import {
+  decodeJpegFragment,
+  integerScaleSize,
+} from "./decoder-core.mjs?v=base43";
 
 let objectUrl = null;
 let displayedImage = null;
