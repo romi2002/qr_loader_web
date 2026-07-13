@@ -18,6 +18,12 @@ Everything after `#` is a URL fragment. The browser uses it to reconstruct the
 JPEG locally; it is not included in the HTTP request to GitHub Pages. The site
 does not upload or persist the image.
 
+Open the browser developer console after loading a QR URL to inspect transfer
+lengths, the exact decoded JPEG bytes, JPEG dimensions and grayscale components,
+quantization tables, compression ratio, and the browser's pixel scaling. These
+diagnostics are console-only; invalid or missing image data still leaves the
+page blank.
+
 ## Publish with GitHub Pages
 
 1. Commit and push this repository's `main` branch to

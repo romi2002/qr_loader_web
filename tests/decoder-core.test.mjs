@@ -6,6 +6,7 @@ import {
   FRAGMENT_VERSION_PREFIX,
   decodeBase43,
   decodeJpegFragment,
+  inspectJpeg,
   integerScaleSize,
 } from "../decoder-core.mjs";
 
@@ -77,4 +78,33 @@ test("fits images into viewports smaller than the source", () => {
     width: 0,
     height: 0,
   });
+});
+
+test("inspects grayscale JPEG dimensions and quantization data", () => {
+  const jpeg = Uint8Array.from([
+    0xff, 0xd8,
+    0xff, 0xdb, 0x00, 0x43, 0x00,
+    ...Array.from({ length: 64 }, (_, index) => index + 1),
+    0xff, 0xc0, 0x00, 0x0b,
+    0x08, 0x00, 0x60, 0x00, 0x70, 0x01,
+    0x01, 0x11, 0x00,
+    0xff, 0xda,
+    0xff, 0xd9,
+  ]);
+
+  const metadata = inspectJpeg(jpeg);
+  assert.equal(metadata.width, 112);
+  assert.equal(metadata.height, 96);
+  assert.equal(metadata.precisionBits, 8);
+  assert.equal(metadata.componentCount, 1);
+  assert.deepEqual(metadata.components, [{
+    id: 1,
+    horizontalSampling: 1,
+    verticalSampling: 1,
+    quantizationTable: 0,
+  }]);
+  assert.equal(metadata.quantizationTables[0].minimum, 1);
+  assert.equal(metadata.quantizationTables[0].maximum, 64);
+  assert.equal(metadata.quantizationTables[0].average, 32.5);
+  assert.deepEqual(metadata.markers, ["SOI", "DQT", "SOF0", "SOS"]);
 });
